@@ -18,7 +18,8 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "stm32f4xx_hal_tim.h"
+#include "stm32f411xe.h"
+#include "stm32f4xx_hal_gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -113,7 +114,9 @@ int main(void)
   {
     /* USER CODE END WHILE */
 
-    /* USER CODE BEGIN 3 */
+   
+   /* Previous code for DIMMING LED Here:
+   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, 1); // Set PA8 high
     HAL_ADC_Start(&hadc1);
     if(HAL_ADC_PollForConversion(&hadc1, 10) == HAL_OK){
       x_axis = HAL_ADC_GetValue(&hadc1); //CHANNEL 10
@@ -126,14 +129,60 @@ int main(void)
     sprintf(msg, "X-axis: %lu, Y-axis: %lu\r\n", x_axis, y_axis);
     HAL_UART_Transmit(&huart2, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
     HAL_Delay(50);
-    int brightness = (y_axis/16); // Scale the value to fit within the PWM range (0-255)
+    int brightness = (y_axis/8); // Scale the value to fit within the PWM range (0-255)
     if(y_axis > 2500) {
       __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1,brightness);
       
     } else if(y_axis < 1950) {
       __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1,brightness);
+    } */
+
+        /* USER CODE BEGIN 3 */
+    //Code for Safety-Critical Buzzer System with RED and GREEN LED for visual feedback
+    // Start ADC and poll for the first channel (X-axis, Channel 10)
+    HAL_ADC_Start(&hadc1);
+    if(HAL_ADC_PollForConversion(&hadc1, 10) == HAL_OK){
+        x_axis = HAL_ADC_GetValue(&hadc1); 
+        
+        // Poll again for the second channel in the sequence (Y-axis, Channel 11)
+        if(HAL_ADC_PollForConversion(&hadc1, 10) == HAL_OK){
+            y_axis = HAL_ADC_GetValue(&hadc1);
+        }
+    }
+    HAL_ADC_Stop(&hadc1);
+
+    // Debugging output to Serial Monitor
+    sprintf(msg, "X: %lu | Y: %lu\r\n", x_axis, y_axis);
+    HAL_UART_Transmit(&huart2, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
+    int sound = (y_axis/9); 
+    
+    if(HAL_GPIO_ReadPin(GPIOB,GPIO_PIN_0) == 1) {
+          if(sound >= 190) {
+            //Cap the highest noise level which is 50% duty cycle
+            HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7, 0); // Set PC7 low when sound is at max
+            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_9, 1); // Set PA9 high when sound is at max
+          }else {
+            HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7, 1); // Set PC7 high when sound is below max
+            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_9, 0); // Set PA9 low when sound is below max
+          }
+          if(sound > 250) sound = 250;
+          // Buzzer Logic: 250 is 50% duty cycle for an ARR of 499
+          if(sound >= 190) {
+              __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, sound); 
+          }else {
+            __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, sound);
+          }
+
+          HAL_Delay(50); 
+
+      } else {
+      __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, 0);//Turn off Buzzer
+      HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7,1);
+      HAL_GPIO_WritePin(GPIOA, GPIO_PIN_9,0);
+    }
+    HAL_Delay(50);
+
     } 
-  }
   /* USER CODE END 3 */
 }
 
@@ -263,9 +312,9 @@ static void MX_TIM2_Init(void)
 
   /* USER CODE END TIM2_Init 1 */
   htim2.Instance = TIM2;
-  htim2.Init.Prescaler = 0;
+  htim2.Init.Prescaler = 83;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 255;
+  htim2.Init.Period = 499;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_PWM_Init(&htim2) != HAL_OK)
@@ -361,6 +410,11 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
+   /*Configure GPIO pin : GPIO PIN 8  */
+  GPIO_InitStruct.Pin = GPIO_PIN_8;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
   /*Configure GPIO pin : GPIO_PIN_0 port A*/
   GPIO_InitStruct.Pin = GPIO_PIN_0;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
@@ -368,8 +422,21 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  
-
+  /*Configure GPIO Pin: GPIO PIN 9*/
+  GPIO_InitStruct.Pin = GPIO_PIN_9;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+  /*Configure GPIO Pin: GPIO PIN 7*/
+  GPIO_InitStruct.Pin = GPIO_PIN_7;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+  /*Configure GPIO Pin: GPIO PIN 0 */
+  GPIO_InitStruct.Pin = GPIO_PIN_0;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
   /* USER CODE END MX_GPIO_Init_2 */
 }
 
