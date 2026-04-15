@@ -21,7 +21,10 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "ssd1306.h"
+#include "ssd1306_tests.h"
+#include "ssd1306_fonts.h"
+#include <stdio.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -40,11 +43,19 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+ADC_HandleTypeDef hadc1;
+
 I2C_HandleTypeDef hi2c1;
 
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
+uint32_t last_beat_time = 0;
+float intervals[10] = {0}; 
+float smoothed_val = 0;
+float previous_val = 0;
+int rise_count = 0;
+int is_rising = 0;
 
 /* USER CODE END PV */
 
@@ -53,6 +64,7 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_I2C1_Init(void);
+static void MX_ADC1_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -93,8 +105,35 @@ int main(void)
   MX_GPIO_Init();
   MX_USART2_UART_Init();
   MX_I2C1_Init();
+  MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
+  ssd1306_Init();
+  ssd1306_TestDrawBitmap();
+  HAL_Delay(300);
+  ssd1306_Fill(Black);
+  ssd1306_SetCursor(0, 10);
+  ssd1306_WriteString("Heart Rate Monitor", Font_7x10, White);
 
+  ssd1306_SetCursor(42, 30);
+  ssd1306_WriteString(".", Font_11x18, White);
+  ssd1306_UpdateScreen();
+  HAL_Delay(500);
+
+  ssd1306_SetCursor(62, 30);
+  ssd1306_WriteString(".", Font_11x18, White);
+  ssd1306_UpdateScreen();
+  HAL_Delay(500);
+
+  ssd1306_SetCursor(82, 30);
+  ssd1306_WriteString(".", Font_11x18, White);
+  ssd1306_UpdateScreen();
+  HAL_Delay(500);
+
+  ssd1306_Fill(Black);
+  ssd1306_SetCursor(0, 30);
+  ssd1306_WriteString("Initializing...", Font_7x10, White);
+  ssd1306_UpdateScreen();
+  HAL_Delay(500);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -103,7 +142,82 @@ int main(void)
   {
     /* USER CODE END WHILE */
 
+    /* Inside the while(1) loop */
+
+    // 1. FILTERING: Average samples over 20ms to kill 50Hz/60Hz light flicker
+    uint32_t window_start = HAL_GetTick();
+    float raw_sum = 0;
+    int samples = 0;
+    while (HAL_GetTick() - window_start < 20) {
+        HAL_ADC_Start(&hadc1);
+        if (HAL_ADC_PollForConversion(&hadc1, 1) == HAL_OK) {
+            raw_sum += HAL_ADC_GetValue(&hadc1);
+            samples++;
+        }
+    }
+    float current_avg = raw_sum / samples;
+
+    // 2. SMOOTHING: Simple Low-Pass Filter (Adjust 0.1 for more/less smoothing)
+    // This prevents small jitters from being counted as heartbeats
+    smoothed_val = (0.1 * current_avg) + (0.9 * previous_val);
+
+    // 3. PEAK DETECTION: Look for a rising edge
+    if (smoothed_val > previous_val) {
+        rise_count++;
+        
+        // If signal rises for 5 consecutive 20ms blocks, it's a heartbeat
+        if (!is_rising && rise_count > 3) {            
+            uint32_t current_time = HAL_GetTick();
+            uint32_t duration = current_time - last_beat_time;
+            
+          // Change your PV section to: float intervals[10]; 
+        if(duration > 2000){
+          last_beat_time = current_time;
+          is_rising = 1;
+        }
+        else if (duration > 333 && duration < 1333) { // Ignore intervals that are too short or too long to be a heartbeat
+            is_rising = 1;
+            last_beat_time = current_time;
+
+            // 1. Shift intervals (Moving Average)
+            float sum = 0;
+            for (int i = 9; i > 0; i--) {
+                intervals[i] = intervals[i-1];
+                sum += intervals[i];
+            }
+            intervals[0] = (float)duration;
+            sum += intervals[0];
+
+            float average_interval = sum / 10.0;
+            float bpm = 60000.0 / average_interval;
+          
+            // 2. ONLY update the screen if the change isn't a crazy "glitch"
+            // (e.g., if the new BPM is within 20% of the last one displayed)
+
+            // Calculate BPM
+            
+            static int display_counter = 0; 
+            display_counter++;
+            if (display_counter>=2) {            
+                char display_buffer[16];
+                sprintf(display_buffer, "HR: %d BPM", (int)bpm);
+                ssd1306_Fill(Black);
+                ssd1306_SetCursor(0, 10);
+                ssd1306_WriteString(display_buffer, Font_7x10, White);
+                ssd1306_UpdateScreen();
+                display_counter = 0;
+            }
+        }
+      }
+    } else {
+        // Signal is falling, reset the lock
+        is_rising = 0;
+        rise_count = 0;
+    }
+
+    previous_val = smoothed_val;
     /* USER CODE BEGIN 3 */
+   
   }
   /* USER CODE END 3 */
 }
@@ -152,6 +266,58 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+}
+
+/**
+  * @brief ADC1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_ADC1_Init(void)
+{
+
+  /* USER CODE BEGIN ADC1_Init 0 */
+
+  /* USER CODE END ADC1_Init 0 */
+
+  ADC_ChannelConfTypeDef sConfig = {0};
+
+  /* USER CODE BEGIN ADC1_Init 1 */
+
+  /* USER CODE END ADC1_Init 1 */
+
+  /** Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion)
+  */
+  hadc1.Instance = ADC1;
+  hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV4;
+  hadc1.Init.Resolution = ADC_RESOLUTION_12B;
+  hadc1.Init.ScanConvMode = DISABLE;
+  hadc1.Init.ContinuousConvMode = DISABLE;
+  hadc1.Init.DiscontinuousConvMode = DISABLE;
+  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
+  hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+  hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+  hadc1.Init.NbrOfConversion = 1;
+  hadc1.Init.DMAContinuousRequests = DISABLE;
+  hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
+  if (HAL_ADC_Init(&hadc1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+  */
+  sConfig.Channel = ADC_CHANNEL_1;
+  sConfig.Rank = 1;
+  sConfig.SamplingTime = ADC_SAMPLETIME_15CYCLES;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN ADC1_Init 2 */
+
+  /* USER CODE END ADC1_Init 2 */
+
 }
 
 /**
