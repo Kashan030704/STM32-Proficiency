@@ -143,7 +143,7 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* Inside the while(1) loop */
-
+    //This code is for the Heart Rate Monitor. It reads the ADC value from the pulse sensor, applies filtering and smoothing, detects peaks, calculates BPM, and updates the OLED display.
     // 1. FILTERING: Average samples over 20ms to kill 50Hz/60Hz light flicker
     uint32_t window_start = HAL_GetTick();
     float raw_sum = 0;
@@ -202,8 +202,8 @@ int main(void)
                 char display_buffer[16];
                 sprintf(display_buffer, "HR: %d BPM", (int)bpm);
                 ssd1306_Fill(Black);
-                ssd1306_SetCursor(0, 10);
-                ssd1306_WriteString(display_buffer, Font_7x10, White);
+                ssd1306_SetCursor(0, 30);
+                ssd1306_WriteString(display_buffer, Font_11x18, White);
                 ssd1306_UpdateScreen();
                 display_counter = 0;
             }
