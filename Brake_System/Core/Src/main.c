@@ -139,6 +139,8 @@ int main(void)
     uint32_t distance_cm = (elapsed * 1715) / 100000;
     if(distance_cm <= 10) {
       HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, 1);
+      ssd1306_SetCursor(0, 30);
+      ssd1306_WriteString("BRAKE!!!", Font_7x10, White);
     } else if(distance_cm <= 20) {
         HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, 1);
         HAL_Delay(180);
@@ -149,10 +151,6 @@ int main(void)
 
     sprintf(msg, "Dist: %lu cm", distance_cm);
     ssd1306_SetCursor(0, 10);
-    ssd1306_WriteString(msg, Font_6x8, White);
-
-    sprintf(msg, "E:%lu", elapsed);
-    ssd1306_SetCursor(0, 25);
     ssd1306_WriteString(msg, Font_6x8, White);
 
     ssd1306_UpdateScreen();
