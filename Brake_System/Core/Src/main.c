@@ -105,13 +105,15 @@ int main(void)
   MX_TIM1_Init();
   /* USER CODE BEGIN 2 */
   ssd1306_Init();
+  HAL_TIM_Base_Start(&htim1);
   /* USER CODE END 2 */
-  HAL_TIM_Base_Start(&htim1);  // Start the microsecond timer
+
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
     /* USER CODE END WHILE */
+
     /* USER CODE BEGIN 3 */
    ssd1306_Fill(Black);
 
@@ -135,6 +137,15 @@ int main(void)
     // Speed of sound = 0.0343 cm/us
     // So: distance_cm = elapsed * 0.01715
     uint32_t distance_cm = (elapsed * 1715) / 100000;
+    if(distance_cm <= 10) {
+      HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, 1);
+    } else if(distance_cm <= 20) {
+        HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, 1);
+        HAL_Delay(180);
+        HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, 0);
+    } else {
+      HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, 0);
+    }
 
     sprintf(msg, "Dist: %lu cm", distance_cm);
     ssd1306_SetCursor(0, 10);
@@ -331,6 +342,9 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOA, LD2_Pin|GPIO_PIN_8, GPIO_PIN_RESET);
 
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_RESET);
+
   /*Configure GPIO pin : B1_Pin */
   GPIO_InitStruct.Pin = B1_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
@@ -349,6 +363,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PC8 */
+  GPIO_InitStruct.Pin = GPIO_PIN_8;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
   /*Configure GPIO pins : LD2_Pin PA8 */
