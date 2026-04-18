@@ -18,12 +18,12 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "ssd1306.h"
-#include "ssd1306_fonts.h"
-#include "stm32f4xx_hal_gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include <stdio.h>
+#include "ssd1306.h"
+#include "ssd1306_fonts.h"
 #include <stdio.h>
 /* USER CODE END Includes */
 
@@ -45,6 +45,8 @@
 /* Private variables ---------------------------------------------------------*/
 I2C_HandleTypeDef hi2c1;
 
+TIM_HandleTypeDef htim1;
+
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
@@ -56,21 +58,11 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_USART2_UART_Init(void);
+static void MX_TIM1_Init(void);
 /* USER CODE BEGIN PFP */
 void delay_us(uint16_t us) {
-    // 1. We reset the clock back to zero
-  //  __HAL_TIM_SET_COUNTER(&htim1, 0);  
-
-    // 2. The "Wait" Loop:
-    // This while loop does NOTHING except check the clock over and over.
-    // It says: "Is the clock less than 10? Yes? Then stay here.
-    // Is it less than 10? Yes? Stay here..."
- //   while (__HAL_TIM_GET_COUNTER(&htim1) < us) {
-        // The CPU just spins its wheels here for exactly 10 ticks (10 microseconds)
-   // }
-    
-    // 3. Once the clock hits 10, the condition becomes FALSE, 
-    // the loop breaks, and the function ends.
+    __HAL_TIM_SET_COUNTER(&htim1, 0);
+    while(__HAL_TIM_GET_COUNTER(&htim1) < us);
 }
 /* USER CODE END PFP */
 
@@ -109,51 +101,52 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_I2C1_Init();
-/*if (HAL_I2C_IsDeviceReady(&hi2c1, (0x3C << 1), 5, 100) == HAL_OK) {
-    // If we get here, the hardware is alive!
-    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, 1); // Turn on Green LED
-} else {
-    // Hardware is not responding or wires are broken
-    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, 0); 
-}*/
-//Above code snippet was testing for my OLED screen to troubleshoot whether it was fried or not.
   MX_USART2_UART_Init();
+  MX_TIM1_Init();
   /* USER CODE BEGIN 2 */
   ssd1306_Init();
   /* USER CODE END 2 */
-
+  HAL_TIM_Base_Start(&htim1);  // Start the microsecond timer
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
     /* USER CODE END WHILE */
-ssd1306_Fill(Black);
+    /* USER CODE BEGIN 3 */
+   ssd1306_Fill(Black);
 
-    // 1. Trigger the sensor
-    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, 1);
-    for(volatile int i = 0; i < 5000; i++); 
     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, 0);
+    delay_us(5);
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, 1);
+    delay_us(10);
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, 0);
+    delay_us(5);
 
-    // 2. Wait for the START of the echo (0 -> 1)
     uint32_t timeout1 = 10000;
     while(HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_2) == 0 && timeout1 > 0) timeout1--;
 
-    // 3. Wait for the END of the echo (1 -> 0)
-    // This is the part that "un-sticks" the 1
-    uint32_t timeout2 = 100000;
+    uint32_t timeout2 = 5000000;
     while(HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_2) == 1 && timeout2 > 0) timeout2--;
 
-    // 4. Update the state
-    // If it successfully went from 0 to 1 and back to 0, we'll see a '1' briefly
-    lux = (timeout1 > 0) ? 1 : 0; 
+    // Calculate elapsed counts and convert to distance
+    uint32_t elapsed = 5000000 - timeout2;
+    // Each count = 1us (timer runs at 1MHz)
+    // Distance = (time_us * speed_of_sound) / 2
+    // Speed of sound = 0.0343 cm/us
+    // So: distance_cm = elapsed * 0.01715
+    uint32_t distance_cm = (elapsed * 1715) / 100000;
 
-    sprintf(msg, "Echo: %d", lux);
+    sprintf(msg, "Dist: %lu cm", distance_cm);
     ssd1306_SetCursor(0, 10);
-    ssd1306_WriteString(msg, Font_11x18, White);
-    ssd1306_UpdateScreen();
+    ssd1306_WriteString(msg, Font_6x8, White);
 
-    HAL_Delay(300); //
-    /* USER CODE BEGIN 3 */
+    sprintf(msg, "E:%lu", elapsed);
+    ssd1306_SetCursor(0, 25);
+    ssd1306_WriteString(msg, Font_6x8, White);
+
+    ssd1306_UpdateScreen();
+    HAL_Delay(300);
+      
   }
   /* USER CODE END 3 */
 }
@@ -239,6 +232,52 @@ static void MX_I2C1_Init(void)
 }
 
 /**
+  * @brief TIM1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM1_Init(void)
+{
+
+  /* USER CODE BEGIN TIM1_Init 0 */
+
+  /* USER CODE END TIM1_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM1_Init 1 */
+
+  /* USER CODE END TIM1_Init 1 */
+  htim1.Instance = TIM1;
+  htim1.Init.Prescaler = 83;
+  htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim1.Init.Period = 65535;
+  htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim1.Init.RepetitionCounter = 0;
+  htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+  if (HAL_TIM_Base_Init(&htim1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim1, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim1, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM1_Init 2 */
+
+  /* USER CODE END TIM1_Init 2 */
+
+}
+
+/**
   * @brief USART2 Initialization Function
   * @param None
   * @retval None
@@ -290,7 +329,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, LD2_Pin|GPIO_PIN_8, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : B1_Pin */
   GPIO_InitStruct.Pin = B1_Pin;
@@ -298,6 +337,20 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
 
+  /*Configure GPIO pins : LD2_Pin PA8 */
+  GPIO_InitStruct.Pin = LD2_Pin|GPIO_PIN_8;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PB2 */
+  GPIO_InitStruct.Pin = GPIO_PIN_2;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /* USER CODE BEGIN MX_GPIO_Init_2 */
   /*Configure GPIO pins : LD2_Pin PA8 */
   GPIO_InitStruct.Pin = GPIO_PIN_8;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
@@ -308,10 +361,8 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin : PB2 */
   GPIO_InitStruct.Pin = GPIO_PIN_2;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
-  /* USER CODE BEGIN MX_GPIO_Init_2 */
 
   /* USER CODE END MX_GPIO_Init_2 */
 }
