@@ -20,6 +20,7 @@
 #include "main.h"
 #include "ssd1306.h"
 #include "ssd1306_fonts.h"
+#include "stm32f4xx_hal_gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -126,17 +127,32 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
-    ssd1306_Fill(Black);
-    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8,1);
-    for(volatile int i = 0; i < 500; i++);
-    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8,0);
-    HAL_Delay(500);
-    lux = HAL_GPIO_ReadPin(GPIOB,GPIO_PIN_2);
+ssd1306_Fill(Black);
+
+    // 1. Trigger the sensor
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, 1);
+    for(volatile int i = 0; i < 5000; i++); 
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, 0);
+
+    // 2. Wait for the START of the echo (0 -> 1)
+    uint32_t timeout1 = 10000;
+    while(HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_2) == 0 && timeout1 > 0) timeout1--;
+
+    // 3. Wait for the END of the echo (1 -> 0)
+    // This is the part that "un-sticks" the 1
+    uint32_t timeout2 = 100000;
+    while(HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_2) == 1 && timeout2 > 0) timeout2--;
+
+    // 4. Update the state
+    // If it successfully went from 0 to 1 and back to 0, we'll see a '1' briefly
+    lux = (timeout1 > 0) ? 1 : 0; 
+
     sprintf(msg, "Echo: %d", lux);
     ssd1306_SetCursor(0, 10);
     ssd1306_WriteString(msg, Font_11x18, White);
     ssd1306_UpdateScreen();
-    HAL_Delay(1000);
+
+    HAL_Delay(300); //
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
@@ -274,7 +290,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, LD2_Pin|GPIO_PIN_8, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : B1_Pin */
   GPIO_InitStruct.Pin = B1_Pin;
@@ -283,7 +299,7 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : LD2_Pin PA8 */
-  GPIO_InitStruct.Pin = LD2_Pin|GPIO_PIN_8;
+  GPIO_InitStruct.Pin = GPIO_PIN_8;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -292,7 +308,7 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin : PB2 */
   GPIO_InitStruct.Pin = GPIO_PIN_2;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
