@@ -19,11 +19,11 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "cmsis_os.h"
-#include "stm32f4xx_hal_tim.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include <stdio.h>
+#include <string.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -33,9 +33,11 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define SERVO_0DEG    1000
+#define SERVO_0DEG     500
+#define SERVO_45DEG   1000
 #define SERVO_90DEG   1500
-#define SERVO_180DEG  2000
+#define SERVO_135DEG  2000
+#define SERVO_180DEG  2500
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -46,7 +48,6 @@
 /* Private variables ---------------------------------------------------------*/
 I2C_HandleTypeDef hi2c1;
 
-TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim2;
 
 UART_HandleTypeDef huart2;
@@ -55,14 +56,14 @@ UART_HandleTypeDef huart2;
 osThreadId_t Task1Handle;
 const osThreadAttr_t Task1_attributes = {
   .name = "Task1",
-  .stack_size = 128 * 4,
+  .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* Definitions for Task2 */
 osThreadId_t Task2Handle;
 const osThreadAttr_t Task2_attributes = {
   .name = "Task2",
-  .stack_size = 128 * 4,
+  .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityLow,
 };
 /* Definitions for myQueue1 */
@@ -80,15 +81,11 @@ static void MX_GPIO_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_TIM2_Init(void);
-static void MX_TIM1_Init(void);
 void StartTask1(void *argument);
 void StartTask2(void *argument);
 
 /* USER CODE BEGIN PFP */
-void delay_us(uint16_t us) {
-    __HAL_TIM_SET_COUNTER(&htim1, 0);
-    while(__HAL_TIM_GET_COUNTER(&htim1) < us);
-}
+
 
 /* USER CODE END PFP */
 
@@ -129,9 +126,7 @@ int main(void)
   MX_I2C1_Init();
   MX_USART2_UART_Init();
   MX_TIM2_Init();
-  MX_TIM1_Init();
   /* USER CODE BEGIN 2 */
-  HAL_TIM_Base_Start(&htim1);
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
   /* USER CODE END 2 */
 
@@ -152,7 +147,7 @@ int main(void)
 
   /* Create the queue(s) */
   /* creation of myQueue1 */
-  myQueue1Handle = osMessageQueueNew (16, sizeof(uint16_t), &myQueue1_attributes);
+  myQueue1Handle = osMessageQueueNew (16, sizeof(uint32_t), &myQueue1_attributes);
 
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
@@ -266,52 +261,6 @@ static void MX_I2C1_Init(void)
   /* USER CODE BEGIN I2C1_Init 2 */
 
   /* USER CODE END I2C1_Init 2 */
-
-}
-
-/**
-  * @brief TIM1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_TIM1_Init(void)
-{
-
-  /* USER CODE BEGIN TIM1_Init 0 */
-
-  /* USER CODE END TIM1_Init 0 */
-
-  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
-  TIM_MasterConfigTypeDef sMasterConfig = {0};
-
-  /* USER CODE BEGIN TIM1_Init 1 */
-
-  /* USER CODE END TIM1_Init 1 */
-  htim1.Instance = TIM1;
-  htim1.Init.Prescaler = 83;
-  htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim1.Init.Period = 65535;
-  htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim1.Init.RepetitionCounter = 0;
-  htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  if (HAL_TIM_Base_Init(&htim1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
-  if (HAL_TIM_ConfigClockSource(&htim1, &sClockSourceConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
-  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim1, &sMasterConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN TIM1_Init 2 */
-
-  /* USER CODE END TIM1_Init 2 */
 
 }
 
@@ -479,7 +428,7 @@ void StartTask1(void *argument)
     // Speed of sound = 0.0343 cm/us
     // So: distance_cm = elapsed * 0.01715
     uint32_t distance_cm = (elapsed * 1715) / 100000;
-    if(distance_cm <= 10) {
+    /*if(distance_cm <= 10) {
       HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, 1);
       HAL_UART_Transmit(&huart2, (uint8_t*)"Object detected within 10 cm\r\n", 30, HAL_MAX_DELAY);
     } else if(distance_cm <= 20) {
@@ -488,8 +437,9 @@ void StartTask1(void *argument)
         HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, 0);
     } else {
       HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, 0);
-    }
-
+    }*/
+    osMessageQueuePut(myQueue1Handle, &distance_cm, 0, 0);
+    osDelay(100); 
   }
   /* USER CODE END 5 */
 }
@@ -504,17 +454,28 @@ void StartTask1(void *argument)
 void StartTask2(void *argument)
 {
   /* USER CODE BEGIN StartTask2 */
+  uint32_t distance_cm = 0;
   /* Infinite loop */
   for(;;)
   {
-  HAL_UART_Transmit(&huart2, (uint8_t*)"Hello from Task2\r\n", 19, HAL_MAX_DELAY);
-    __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, SERVO_0DEG);
-    osDelay(1000);
-    __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, SERVO_90DEG);
-    osDelay(1000);
-    __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, SERVO_180DEG);
-    osDelay(1000);
+  osMessageQueueGet(myQueue1Handle, &distance_cm, 0, osWaitForever);
+  HAL_UART_Transmit(&huart2, (uint8_t*)"Task2 distance: ", 16, HAL_MAX_DELAY);
+  char distance_str[16];
+  snprintf(distance_str, sizeof(distance_str), "%lu cm\r\n", (unsigned long)distance_cm);
+  HAL_UART_Transmit(&huart2, (uint8_t*)distance_str, strlen(distance_str), HAL_MAX_DELAY);
+  // then use it to actually control the servo
+  if(distance_cm <= 10) {
+      __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, SERVO_0DEG);   // lock
+  } else if(distance_cm <= 20) {
+      __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, SERVO_45DEG);  // half open
+  } else if(distance_cm <= 30) {
+      __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, SERVO_90DEG); // three-quarter open
+  } else if(distance_cm <= 40) {
+      __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, SERVO_135DEG); // fully open
+  } else{
+      __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, SERVO_180DEG); // fully open
   }
+    }
   /* USER CODE END StartTask2 */
 }
 
