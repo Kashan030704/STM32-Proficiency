@@ -24,6 +24,7 @@
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
 #include <string.h>
+#include <sys/types.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -464,18 +465,12 @@ void StartTask2(void *argument)
   snprintf(distance_str, sizeof(distance_str), "%lu cm\r\n", (unsigned long)distance_cm);
   HAL_UART_Transmit(&huart2, (uint8_t*)distance_str, strlen(distance_str), HAL_MAX_DELAY);
   // then use it to actually control the servo
-  if(distance_cm <= 10) {
-      __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, SERVO_0DEG);   // lock
-  } else if(distance_cm <= 20) {
-      __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, SERVO_45DEG);  // half open
-  } else if(distance_cm <= 30) {
-      __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, SERVO_90DEG); // three-quarter open
-  } else if(distance_cm <= 40) {
-      __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, SERVO_135DEG); // fully open
-  } else{
-      __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, SERVO_180DEG); // fully open
-  }
+  if(distance_cm <= 100) {
+      __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, SERVO_180DEG);   // lock
+  } else {
+      __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, SERVO_0DEG);    // open
     }
+  }
   /* USER CODE END StartTask2 */
 }
 
