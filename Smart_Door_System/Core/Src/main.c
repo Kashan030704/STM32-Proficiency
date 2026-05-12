@@ -32,7 +32,9 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define SERVO_0DEG    1000
+#define SERVO_90DEG   1500
+#define SERVO_180DEG  2000
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -42,6 +44,8 @@
 
 /* Private variables ---------------------------------------------------------*/
 I2C_HandleTypeDef hi2c1;
+
+TIM_HandleTypeDef htim2;
 
 UART_HandleTypeDef huart2;
 
@@ -59,6 +63,11 @@ const osThreadAttr_t Task2_attributes = {
   .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityLow,
 };
+/* Definitions for myQueue1 */
+osMessageQueueId_t myQueue1Handle;
+const osMessageQueueAttr_t myQueue1_attributes = {
+  .name = "myQueue1"
+};
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -68,6 +77,7 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_USART2_UART_Init(void);
+static void MX_TIM2_Init(void);
 void StartTask1(void *argument);
 void StartTask2(void *argument);
 
@@ -111,8 +121,9 @@ int main(void)
   MX_GPIO_Init();
   MX_I2C1_Init();
   MX_USART2_UART_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
-
+  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -129,6 +140,10 @@ int main(void)
   /* USER CODE BEGIN RTOS_TIMERS */
   /* start timers, add new ones, ... */
   /* USER CODE END RTOS_TIMERS */
+
+  /* Create the queue(s) */
+  /* creation of myQueue1 */
+  myQueue1Handle = osMessageQueueNew (16, sizeof(uint16_t), &myQueue1_attributes);
 
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
@@ -246,6 +261,55 @@ static void MX_I2C1_Init(void)
 }
 
 /**
+  * @brief TIM2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM2_Init(void)
+{
+
+  /* USER CODE BEGIN TIM2_Init 0 */
+
+  /* USER CODE END TIM2_Init 0 */
+
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
+
+  /* USER CODE BEGIN TIM2_Init 1 */
+
+  /* USER CODE END TIM2_Init 1 */
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 83;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 19999;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_PWM_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 0;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM2_Init 2 */
+
+  /* USER CODE END TIM2_Init 2 */
+  HAL_TIM_MspPostInit(&htim2);
+
+}
+
+/**
   * @brief USART2 Initialization Function
   * @param None
   * @retval None
@@ -297,7 +361,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, LD2_Pin|GPIO_PIN_8, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : B1_Pin */
   GPIO_InitStruct.Pin = B1_Pin;
@@ -305,8 +369,8 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : LD2_Pin PA8 */
-  GPIO_InitStruct.Pin = LD2_Pin|GPIO_PIN_8;
+  /*Configure GPIO pin : PA8 */
+  GPIO_InitStruct.Pin = GPIO_PIN_8;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -335,8 +399,12 @@ void StartTask1(void *argument)
   for(;;)
   {
     HAL_UART_Transmit(&huart2, (uint8_t*)"Hello from Task1\r\n", 19, HAL_MAX_DELAY);
-    HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_8);
-    osDelay(500);
+    __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, SERVO_0DEG);
+    osDelay(1000);
+    __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, SERVO_90DEG);
+    osDelay(1000);
+    __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, SERVO_180DEG);
+    osDelay(1000);
   }
   /* USER CODE END 5 */
 }
@@ -355,8 +423,9 @@ void StartTask2(void *argument)
   for(;;)
   {
     HAL_UART_Transmit(&huart2, (uint8_t*)"Hello from Task2\r\n", 19, HAL_MAX_DELAY);
-    HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_8);
     osDelay(500);
+    osThreadTerminate(Task2Handle);
+
   }
   /* USER CODE END StartTask2 */
 }
