@@ -5,12 +5,28 @@ Hardware and firmware projects built on the STM32 Nucleo-F411RE using C and the 
 ---
 
 ## Table of Contents
+- [Smart Door Lock System](#smart-door-lock-system)
 - [Heart Rate Monitor](#heart-rate-monitor)
 - [Car Brake System](#car-brake-system)
 - [Industrial Acoustic Safety System](#industrial-acoustic-safety-system)
 - [Project Doorbell](#project-doorbell)
 - [Night Light](#night-light)
 - [Thermometer](#thermometer)
+
+---
+
+## Smart Door Lock System
+**Stack:** STM32F411RE, C, FreeRTOS, CMSIS-OS2, TIM2, PWM, UART, HC-SR04, SG90
+
+Proximity-triggered door unlock system built on FreeRTOS with two concurrent tasks communicating via a message queue.
+
+🎥 [Watch Demo]()
+
+**Key Technical Decisions**
+- Dual-task FreeRTOS architecture uses osMessageQueue for producer-consumer data passing between sensor and servo tasks
+- TIM2 configured at 50Hz with 83 prescaler and ARR 19999 derived from 84MHz APB1 clock for hardware PWM servo control
+- Integer-only distance formula eliminates floating point overhead on Cortex-M4
+- UART2 streams real-time telemetry at 115200 baud over VCP for live debugging
 
 ---
 
