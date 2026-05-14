@@ -20,7 +20,7 @@ Hardware and firmware projects built on the STM32 Nucleo-F411RE using C and the 
 
 Proximity-triggered door unlock system built on FreeRTOS with two concurrent tasks communicating via a message queue.
 
-🎥 [Watch Demo]()
+🎥 [Watch Demo](https://youtube.com/shorts/piCBjWwCGH8?si=slvm1eOTRlZeGroq)
 
 **Key Technical Decisions**
 - Dual-task FreeRTOS architecture uses osMessageQueue for producer-consumer data passing between sensor and servo tasks
