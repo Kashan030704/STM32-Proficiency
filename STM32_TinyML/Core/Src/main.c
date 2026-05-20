@@ -22,7 +22,9 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "ai_platform.h"
+#include "network.h"
+#include "network_data.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -53,7 +55,16 @@ const osThreadAttr_t defaultTask_attributes = {
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* USER CODE BEGIN PV */
+#define ANOMALY_THRESHOLD  0.000127f
+#define ADC_MAX            4095.0f
+#define WINDOW_SIZE        8
 
+static uint16_t adc_buf[WINDOW_SIZE] = {0};
+static uint8_t  buf_head = 0;
+
+static ai_handle network = AI_HANDLE_NULL;
+static ai_u8 activations[AI_NETWORK_DATA_ACTIVATIONS_SIZE];
+static const ai_handle activation_buffers[] = { activations };
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -104,7 +115,8 @@ int main(void)
   MX_TIM2_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
-
+  // Initialize X-CUBE-AI network
+  ai_network_create_and_init(&network, activation_buffers, NULL);
   /* USER CODE END 2 */
 
   /* Init scheduler */
