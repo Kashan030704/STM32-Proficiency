@@ -728,44 +728,44 @@
   ],
   "environment": {
     "generated_model": {
-      "generated_time": "2026-05-19T21:15:41-0400",
+      "generated_time": "2026-05-19T21:49:17-0400",
       "model_files": [
         {
           "name": "network_data_params.h",
-          "signature": "0x051613e9937b1a1e1af8d5185cdec79b"
+          "signature": "0x8a0e827d1ea9d0d642430d73c247f5e6"
         },
         {
           "name": "network_data_params.c",
-          "signature": "0x665af0742924257931507348f348779e"
+          "signature": "0x9b6a0dd0ae9805f736eeba3280e25813"
         },
         {
           "name": "network_data.h",
-          "signature": "0x61b18d9d1ec1f2fa44b4b8c9e86a1758"
+          "signature": "0x31ca57ccef32402d0af171a3c53df647"
         },
         {
           "name": "network_data.c",
-          "signature": "0x0a94d4baa6b2b4e70bb91485733d99af"
+          "signature": "0xee2a92c85dc298f87951daa918fb51b8"
         },
         {
           "name": "network_config.h",
-          "signature": "0xb34e36ca142407d70e3479677db3c345"
+          "signature": "0x7375187128c28dd345754bf7a6a7c663"
         },
         {
           "name": "network.h",
-          "signature": "0x0ad380eb3dfd56459beca26c6b2ebf40"
+          "signature": "0x308b7d40bcd40016f4809ca97e9c3c88"
         },
         {
           "name": "network.c",
-          "signature": "0x5fb954d2916f72a0b177e7b4130b1257"
+          "signature": "0x2ad321d0d67e7facf59009ca05b84117"
         }
       ],
       "name": "network"
     },
-    "network_signature": "0x1672ce977c43e495",
+    "network_signature": "0x90d30e5045bf2d9e",
     "test_name": "",
     "tools": [
       {
-        "arguments": "generate --target stm32f4 --name network -m C:/ai/mq3_model.tflite --compression none --verbosity 1 --workspace C:/Users/kashk/AppData/Local/Temp/mxAI_workspace59597733943007642767179147017871 --output C:/Users/kashk/.stm32cubemx/network_output",
+        "arguments": "generate --target stm32f4 --name network -m C:/ai/mq3_model.tflite --compression none --verbosity 1 --workspace C:/Users/kashk/AppData/Local/Temp/mxAI_workspace798097790550014326799402719836400 --output C:/Users/kashk/.stm32cubemx/network_output",
         "environment": [
           "STATS_TYPE=X-CUBE-AI"
         ],
